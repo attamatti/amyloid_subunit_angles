@@ -141,6 +141,9 @@ def subunit_plane(Ca_coords,layername,color):
     
     bildout.close()
     return(PN,meanpoint)
+
+errmsg = '\nUSAGE: amyloid_angles.py <pdb file> <chain 1> <chain 2>'
+
 try:
     chain1 = sys.argv[2]
     chain2 = sys.argv[3]
@@ -164,6 +167,8 @@ axisbild.write('.cylinder {} {} {} {} {} {} 0.8'.format(zstart[0],zstart[1],zsta
 z_unit = np.array([0,0,1])
 angle_su1 = np.degrees(np.arccos(np.dot(su1_plane_normal, z_unit) / (np.linalg.norm(su1_plane_normal) * np.linalg.norm(z_unit))))
 angle_su2 = np.degrees(np.arccos(np.dot(su2_plane_normal, z_unit) / (np.linalg.norm(su2_plane_normal) * np.linalg.norm(z_unit))))
+angle_between = np.degrees(np.arccos(np.dot(su2_plane_normal, su1_plane_normal) / (np.linalg.norm(su2_plane_normal) * np.linalg.norm(su1_plane_normal))))
 
-print('\nAngle of subunit 1 - chain {0}: {1} degrees'.format(chain1,round(angle_su1,2)))
-print('Angle of subunit 2 - chain {0}: {1} degrees'.format(chain2,round(angle_su2,2)))
+print('\nAngle of subunit 1 to z - chain {0}: {1} degrees'.format(chain1,round(angle_su1,2)))
+print('Angle of subunit 2 to z - chain {0}: {1} degrees'.format(chain2,round(angle_su2,2)))
+print('Angle between two subunits: {1} degrees'.format(chain2,round(angle_between,2)))
