@@ -184,7 +184,8 @@ for i in chains1:
 print('mean','SD',np.mean(tmp_sums),np.std(tmp_sums))
 
 tmp_sums=[]
-print('\nprotofilament 2')
+print('\nintra-protofilament angles')
+print('protofilament 2')
 for i in itertools.combinations(chains2, 2):
     ang = angle_between_vecs(chains_n_planes2[i[0]][0],chains_n_planes2[i[1]][0])
     print (i,ang)
@@ -193,6 +194,7 @@ print('mean','SD',np.mean(tmp_sums),np.std(tmp_sums))
 
 tmp_sums=[]
 pf2angs = []
+print('angles between plane normal vectors and z-axis')
 for i in chains2:
     uv = chains_n_planes2[i[0]][0]
     ang = angle_between_vecs(uv,[0.0,0.0,1.0])
