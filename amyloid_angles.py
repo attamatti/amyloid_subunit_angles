@@ -3,6 +3,7 @@
 import sys
 import numpy as np
 import scipy
+import itertools
 
 def calc_xydist(point,meanpoint):
     '''calculate the distance in x and y from the mean point'''
@@ -10,7 +11,7 @@ def calc_xydist(point,meanpoint):
     yd = abs(point[1]-meanpoint[1])
     return([xd,yd])
 
-def read_pdb_get_Ps(pdbfile,chain1,chain2):
+def read_pdb_get_Ps(pdbfile,chain1):
     '''get the xy coordinates of the two MSP proteins'''
     filename = pdbfile.split('/')[-1].split('.')[0]
     filedata = open(pdbfile,'r').readlines()
@@ -29,15 +30,12 @@ def read_pdb_get_Ps(pdbfile,chain1,chain2):
                     except:
                         cas[chain] = {atomno:([i[31:38],i[38:47],i[47:55]])}
     ## get the 2 subunit' Ca coords
-    L1Cas,L2Cas = [],[]         # just the x and y coords of all subunit CAs
+    L1Cas = []         # just the x and y coords of all subunit CAs
     for chain in cas:
         if chain == chain1:
             for aa in cas[chain]:
                 L1Cas.append([float(x) for x in cas[chain][aa]])
-        elif chain == chain2:
-            for aa in cas[chain]:
-                L2Cas.append([float(x) for x in cas[chain][aa]])
-    return(L1Cas,L2Cas)
+    return(L1Cas)
 
 def fit_plane(initial,XYZ,xscale,yscale):
     '''returns plane normal vector and two parallel vectors'''
@@ -53,12 +51,12 @@ def fit_plane(initial,XYZ,xscale,yscale):
     
     from scipy.optimize import leastsq
     sol = leastsq(residuals, p0, args=(None, XYZ))[0]
-    print("Solution: ", sol)
-    print("Old Error: ", (f_min(XYZ, p0)**2).sum())
-    print("New Error: ", (f_min(XYZ, sol)**2).sum())
+    #print("Solution: ", sol)
+    #print("Old Error: ", (f_min(XYZ, p0)**2).sum())
+    #print("New Error: ", (f_min(XYZ, sol)**2).sum())
 
     a,b,c,d = sol[0],sol[1],sol[2],sol[3]    
-    print('Equation for fit plane: {0}x + {1}y + {2}z + {3} = 0'.format(a, b, c, d))
+    #print('Equation for fit plane: {0}x + {1}y + {2}z + {3} = 0'.format(a, b, c, d))
     
     ## calculate plane normal:
     PNx = a
@@ -69,8 +67,8 @@ def fit_plane(initial,XYZ,xscale,yscale):
     #calculate plane vectors
     e1 = [c-b,a-c,b-a]
     e2 = [a*(b+c)-b**2-c**2,   b*(a+c)-a**2-c**2,   c*(a+b)-a**2-b**2]
-    print ('e1',e1)
-    print ('e2',e2)
+    #print ('e1',e1)
+    #print ('e2',e2)
     
     # get unit vector for plane vector and plane normal vector
     e1mag = np.sqrt((e1[0]**2)+(e1[1]**2)+(e1[2]**2))
@@ -81,11 +79,11 @@ def fit_plane(initial,XYZ,xscale,yscale):
 
     PN_mag = np.sqrt((PNx**2)+(PNy**2)+(PNz**2))
     PN_unit= [(x/PN_mag) for x in [a,b,c]]
-    print ('plane normal',PNx,PNy,PNz)
-    print ('plane normal unit vector',PN_unit)
+    #print ('plane normal',PNx,PNy,PNz)
+    #print ('plane normal unit vector',PN_unit)
     if PN_unit[2] < 0:
         PN_unit = [PN_unit[0],PN_unit[1],-PN_unit[2]]
-        print ('flipped plane normal unit vector',PN_unit)
+        #print ('flipped plane normal unit vector',PN_unit)
 
     return(PN_unit,e1,e2,(a,b,c,d))
 
@@ -98,19 +96,19 @@ def plane_from_points(p1,p2,p3):
     d = np.dot(cp, p3)
     e1 = [c-b,a-c,b-a]
     e2 = [a*(b+c)-b**2-c**2,   b*(a+c)-a**2-c**2,   c*(a+b)-a**2-b**2]
-    print('Equation for starting plane: {0}x + {1}y + {2}z = {3}'.format(a, b, c, d))
+    #print('Equation for starting plane: {0}x + {1}y + {2}z = {3}'.format(a, b, c, d))
     return(a,b,c,-d)
 
-def subunit_plane(Ca_coords,layername,color):
+def subunit_plane(Ca_coords,layername,color,chainname):
     '''fit a plane to the CA coordinates - starting with a plane perpendicular to the z axis as 1st guess'''
-    bildout = open('{0}_diag.bild'.format(layername),'w')
+    bildout = open('{1}_{0}_plane.bild'.format(layername,chainname),'w')
 
     #### make starting plane    
     for ca in Ca_coords:
         bildout.write('.sphere {0} {1} {2} 0.5\n'.format(ca[0],ca[1],ca[2]))
     meanpoint = [np.mean([x[0] for x in Ca_coords]),np.mean([x[1] for x in Ca_coords]),np.mean([x[2] for x in Ca_coords])]
     startingplane = plane_from_points(np.array([meanpoint[0]+20,meanpoint[1]+20,meanpoint[2]]),np.array([meanpoint[0]-20,meanpoint[1]-20,meanpoint[2]]),np.array([meanpoint[0]-10,meanpoint[1]-15,meanpoint[2]]))
-    print('starting plane',startingplane)
+    #print('starting plane',startingplane)
 
     ### fit the actual coords using intial plabe as 1st guess
     xyz = np.array([[x[0] for x in Ca_coords],[x[1] for x in Ca_coords],[x[2] for x in Ca_coords]])
@@ -132,7 +130,8 @@ def subunit_plane(Ca_coords,layername,color):
     tpp4 = [meanpoint[0]-e2[0],meanpoint[1]-e2[1],meanpoint[2]-e2[2]]
 
     ## draw the plane normal vector    
-    bildout.write('.arrow {0} {1} {2} {3} {4} {5} 0.5 0.85 \n'.format(meanpoint[0],meanpoint[1],meanpoint[2],meanpoint[0]+(PN[0]*10),meanpoint[1]+(PN[1]*10),meanpoint[2]+(PN[2]*10)))
+    bildout.write('.arrow {0} {1} {2} {3} {4} {5} 0.2 0.4 \n'.format(meanpoint[0],meanpoint[1],meanpoint[2],meanpoint[0]+(PN[0]*10),meanpoint[1]+(PN[1]*10),meanpoint[2]+(PN[2]*10)))
+    bildout.write('.v {0} {1} {2} {3} {4} {5} \n'.format(meanpoint[0],meanpoint[1],meanpoint[2],meanpoint[0],meanpoint[1],meanpoint[2]+(10)))
 
     # draw the fit plane
     bildout.write('.color {0}\n'.format(color))
@@ -142,33 +141,82 @@ def subunit_plane(Ca_coords,layername,color):
     bildout.close()
     return(PN,meanpoint)
 
-errmsg = '\nUSAGE: amyloid_angles.py <pdb file> <chain 1> <chain 2>'
+def angle_between_vecs(vector1,vector2):
+    '''angle between the unit vector of two vectors in [i,j,k] format'''
+    angle =np.degrees(np.arccos(np.dot(vector1, vector2) / (np.linalg.norm(vector1) * np.linalg.norm(vector2))))
+    return(angle)
+
+
+errmsg = '\nUSAGE: amyloid_angles.py <pdb file> <protofilament 1 chains> <protofilament2 chains>\n list chains like this ABCDE  GFHIJK\nmake sure they are in order'
 
 try:
-    chain1 = sys.argv[2]
-    chain2 = sys.argv[3]
-    SU1,SU2 = read_pdb_get_Ps(sys.argv[1],chain1,chain2)
+    thefile = sys.argv[1]
+    chains1 = [x for x in sys.argv[2]]
+    chains2 = [x for x in sys.argv[3]]
 except:
     sys.exit(errmsg)
-    
-print('\nsubunit 1 - chain {0}'.format(chain1))
-su1_plane_normal,MP1 = subunit_plane(SU1,'subunit1','red')
-print('\nsubunit 2 - chain {0}'.format(chain2))
-su2_plane_normal,MP2 = subunit_plane(SU2,'subunit2','yellow')
 
-### Draw the z-axis
-zstart = [(x[0]+x[1])/2 for x in zip(MP1,MP2)]
-print('zaxis starting point',zstart)
-axisbild = open('z-axis.bild','w')
-axisbild.write('.color blue\n')
-axisbild.write('.cylinder {} {} {} {} {} {} 0.8'.format(zstart[0],zstart[1],zstart[2]-30,zstart[0],zstart[1],zstart[2]+20))
+chains_n_planes1 = {}        #{chain:[PN vector,midpoint]} for protofil 1
+chains_n_planes2 = {}        #{chain:[PN vector,midpoint]} for protofil 2
+for i in chains1:
+    chains_n_planes1[i] = subunit_plane(read_pdb_get_Ps(thefile,i),'subunit1','red',i)
+for i in chains2:
+    chains_n_planes2[i] = subunit_plane(read_pdb_get_Ps(thefile,i),'subunit2','blue',i)
 
-#### print results
-z_unit = np.array([0,0,1])
-angle_su1 = np.degrees(np.arccos(np.dot(su1_plane_normal, z_unit) / (np.linalg.norm(su1_plane_normal) * np.linalg.norm(z_unit))))
-angle_su2 = np.degrees(np.arccos(np.dot(su2_plane_normal, z_unit) / (np.linalg.norm(su2_plane_normal) * np.linalg.norm(z_unit))))
-angle_between = np.degrees(np.arccos(np.dot(su2_plane_normal, su1_plane_normal) / (np.linalg.norm(su2_plane_normal) * np.linalg.norm(su1_plane_normal))))
+print('intra-protofilament angles')
+print('protofilament 1')
 
-print('\nAngle of subunit 1 to z - chain {0}: {1} degrees'.format(chain1,round(angle_su1,2)))
-print('Angle of subunit 2 to z - chain {0}: {1} degrees'.format(chain2,round(angle_su2,2)))
-print('Angle between two subunits: {1} degrees'.format(chain2,round(angle_between,2)))
+tmp_sums=[]
+for i in itertools.combinations(chains1, 2):
+    print (i,angle_between_vecs(chains_n_planes1[i[0]][0],chains_n_planes1[i[1]][0]))
+    tmp_sums.append(angle_between_vecs(chains_n_planes1[i[0]][0],chains_n_planes1[i[1]][0]))
+print('mean','SD',np.mean(tmp_sums),np.std(tmp_sums))
+
+tmp_sums=[]
+pf1angs = []
+print('angles between plane normal vectors and z-axis')
+for i in chains1:
+    uv = chains_n_planes1[i[0]][0]
+    ang = angle_between_vecs(uv,[0.0,0.0,1.0])
+    print(i,ang)
+    tmp_sums.append(ang)
+    pf1angs.append(uv)
+print('mean','SD',np.mean(tmp_sums),np.std(tmp_sums))
+
+tmp_sums=[]
+print('\nprotofilament 2')
+for i in itertools.combinations(chains2, 2):
+    ang = angle_between_vecs(chains_n_planes2[i[0]][0],chains_n_planes2[i[1]][0])
+    print (i,ang)
+    tmp_sums.append(angle_between_vecs(chains_n_planes2[i[0]][0],chains_n_planes2[i[1]][0]))
+print('mean','SD',np.mean(tmp_sums),np.std(tmp_sums))
+
+tmp_sums=[]
+pf2angs = []
+for i in chains2:
+    uv = chains_n_planes2[i[0]][0]
+    ang = angle_between_vecs(uv,[0.0,0.0,1.0])
+    print(i,ang)
+    tmp_sums.append(ang)
+    pf2angs.append(uv)
+print('mean','SD',np.mean(tmp_sums),np.std(tmp_sums))
+
+
+#### draw summary graphics
+def draw_sum_bild(angs,name):
+    sumbild = open('summary_{0}.bild'.format(name),'w')
+    sumbild.write('.color red\n')
+    for i in angs:
+        ivals = [str(x) for x in i]
+        sumbild.write('.v 0 0 0 {0}\n'.format(' '.join(ivals)))
+    meanangi = np.mean([x[0] for x in angs])
+    meanangj = np.mean([x[1] for x in angs])
+    meanangk = np.mean([x[2] for x in angs])
+    sumbild.write('.color yellow\n')
+    sumbild.write('.v 0 0 0 {0} {1} {2} \n'.format(meanangi,meanangj,meanangk))
+    sumbild.write('.color blue\n')
+    sumbild.write('.v 0 0 0 0 0 1')
+    sumbild.close()
+
+draw_sum_bild(pf1angs,'protofil1')
+draw_sum_bild(pf2angs,'protofil2')
